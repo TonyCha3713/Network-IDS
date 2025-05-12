@@ -1,9 +1,3 @@
-# NSL-KDD IDS System
-# Files:
-# 1. preprocess.py - Parses the dataset and prepares it for training
-# 2. train.py - Trains the model on the preprocessed data
-# 3. ids.py - Captures live traffic and classifies it as normal or an intrusion
-
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 import joblib
@@ -27,10 +21,9 @@ column_names = [
     'dst_host_rerror_rate', 'dst_host_srv_rerror_rate', 'label', 'difficulty'
 ]
 
-# Important: Since there are no headers, we must explicitly set header=None
 data = pd.read_csv('KDDTrain+.txt', names=column_names, header=None)
 
-# 🔥 **Select All Features**
+# Select All Features
 selected_columns = column_names[:-2]  # Exclude 'label' and 'difficulty'
 
 # Encode categorical features

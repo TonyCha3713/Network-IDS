@@ -1,9 +1,3 @@
-# NSL-KDD IDS System
-# Files:
-# 1. preprocess.py - Parses the dataset and prepares it for training
-# 2. train.py - Trains the model on the preprocessed data
-# 3. ids.py - Captures live traffic and classifies it as normal or an intrusion
-
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier

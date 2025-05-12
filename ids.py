@@ -1,9 +1,3 @@
-# NSL-KDD IDS System
-# Files:
-# 1. preprocess.py - Parses the dataset and prepares it for training
-# 2. train.py - Trains the model on the preprocessed data
-# 3. ids.py - Captures live traffic and classifies it as normal or an intrusion
-
 from scapy.all import sniff, IP, TCP, UDP, ICMP
 import pandas as pd
 import joblib
@@ -28,6 +22,7 @@ log_file = f'logs/intrusion_log_{int(time.time())}.txt'
 port_scan_log = f'logs/port_scan_log_{int(time.time())}.txt'
 packet_log_file = f'logs/packet_log_{int(time.time())}.csv'
 aggressive_log = f'logs/aggressive_log_{int(time.time())}.txt'
+
 # Mapping protocol types
 PROTOCOLS = {
     6: 'tcp',
@@ -45,9 +40,6 @@ TCP_FLAG_MAP = {
     'PA': 'S1',
     'OTH': 'OTH'
 }
-
-# IDS Connection Tracker
-connection_tracker = {}
 
 # Map common ports to services
 SERVICE_PORTS = {
@@ -70,7 +62,7 @@ THRESHOLD_CONNECTIONS = 25 # 25 connections in 5 seconds
 THRESHOLD_UDP = 15         # 15 UDP packets in 5 seconds
 RESET_INTERVAL = 5         # Reset counters every 5 seconds
 
-# ✅ **Complete List of Features with Aggressive Defaults**
+# Complete List of Features with Aggressive Defaults
 TRAIN_FEATURES = [
     'duration', 'protocol_type', 'service', 'flag', 'src_bytes',
     'dst_bytes', 'land', 'wrong_fragment', 'urgent', 'hot',
@@ -85,7 +77,7 @@ TRAIN_FEATURES = [
     'dst_host_serror_rate', 'dst_host_srv_serror_rate',
     'dst_host_rerror_rate', 'dst_host_srv_rerror_rate'
 ]
-# 🚩 **Aggressive Default Values**
+# Default Values
 DEFAULT_VALUES = {feature: 0 for feature in TRAIN_FEATURES}
 DEFAULT_VALUES.update({
     'serror_rate': 0.05,
@@ -94,12 +86,15 @@ DEFAULT_VALUES.update({
     'srv_rerror_rate': 0.05,
     'same_srv_rate': 0.05,
 })
+connection_tracker = {}
+
 def get_tcp_flag(packet):
     if packet.haslayer(TCP):
         flags = packet[TCP].flags
         flag_str = str(flags)
         return TCP_FLAG_MAP.get(flag_str, 'OTH')
     return 'OTH'
+
 def extract_features(packet):
     try:
         if not packet.haslayer(IP):
@@ -114,7 +109,7 @@ def extract_features(packet):
             connection_tracker[src_ip] = DEFAULT_VALUES.copy()
             connection_tracker[src_ip]['start_time'] = current_time
 
-        # Time-based reset every 5 seconds
+        # Time-based reset
         if current_time - connection_tracker[src_ip]['start_time'] > RESET_INTERVAL:
             connection_tracker[src_ip] = DEFAULT_VALUES.copy()
             connection_tracker[src_ip]['start_time'] = current_time
@@ -130,21 +125,21 @@ def extract_features(packet):
         if packet.haslayer(UDP):
             connection_tracker[src_ip]['srv_count'] += 1
 
-        # 🚩 **Threshold-Based Detection**
+        # Threshold-Based Detection
         if connection_tracker[src_ip]['serror_rate'] >= THRESHOLD_SYN and packet.haslayer(TCP):
-            alert_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ALERT] SYN Flood Detected from {src_ip} 🚨"
+            alert_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ALERT] SYN Flood Detected from {src_ip}"
             print(alert_msg)
             with open(aggressive_log, 'a') as f:
                 f.write(alert_msg + "\n")
         
         if connection_tracker[src_ip]['count'] >= THRESHOLD_CONNECTIONS:
-            alert_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ALERT] Port Scan Detected from {src_ip} 🚨"
+            alert_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ALERT] Port Scan Detected from {src_ip}"
             print(alert_msg)
             with open(aggressive_log, 'a') as f:
                 f.write(alert_msg + "\n")
 
         if connection_tracker[src_ip]['srv_count'] >= THRESHOLD_UDP and packet.haslayer(UDP):
-            alert_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ALERT] UDP Flood Detected from {src_ip} 🚨"
+            alert_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ALERT] UDP Flood Detected from {src_ip}"
             print(alert_msg)
             with open(aggressive_log, 'a') as f:
                 f.write(alert_msg + "\n")
@@ -154,7 +149,7 @@ def extract_features(packet):
         service = SERVICE_PORTS.get(dst_port, 'other')
         flag = get_tcp_flag(packet)
         
-        # ✅ **Encoding Logic**
+        # Encoding Logic
         if protocol in protocol_encoder.classes_:
             protocol_encoded = protocol_encoder.transform([protocol])[0]
         else:
@@ -173,7 +168,7 @@ def extract_features(packet):
             print(f"[WARNING] Flag '{flag}' not recognized. Defaulting to 'OTH'.")
             flag_encoded = flag_encoder.transform(['OTH'])[0]
 
-        # 🚩 **Updated Feature Dictionary**
+        # Updated Feature Dictionary
         features = DEFAULT_VALUES.copy()
         features.update({
             'protocol_type': protocol_encoded,  # <-- Now encoded as an integer
@@ -181,9 +176,7 @@ def extract_features(packet):
             'flag': flag_encoded,               # <-- Now encoded as an integer
         })
 
-        # Convert to DataFrame
         features_df = pd.DataFrame([features])
-        # Scale the data
         features_scaled = scaler.transform(features_df)
         return features_scaled
 
