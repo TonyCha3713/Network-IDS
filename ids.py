@@ -56,9 +56,21 @@ SERVICE_PORTS = {
     8080: 'http-alt'
 }
 
+MONITORED_PORTS = {
+    22: 'SSH',
+    23: 'Telnet',
+    25: 'SMTP',
+    53: 'DNS',
+    80: 'HTTP',
+    443: 'HTTPS',
+    3306: 'MySQL',
+    8080: 'HTTP-ALT'
+}
+
 # Threshold values (aggressive)
 THRESHOLD_SYN = 10         # 10 SYN packets in 5 seconds
 THRESHOLD_CONNECTIONS = 25 # 25 connections in 5 seconds
+THRESHOLD_PORT_SCAN = 3    # 3 hits on critical ports
 THRESHOLD_UDP = 15         # 15 UDP packets in 5 seconds
 RESET_INTERVAL = 5         # Reset counters every 5 seconds
 
@@ -87,6 +99,7 @@ DEFAULT_VALUES.update({
     'same_srv_rate': 0.05,
 })
 connection_tracker = {}
+port_tracker = {port: 0 for port in MONITORED_PORTS}
 
 def get_tcp_flag(packet):
     if packet.haslayer(TCP):
@@ -132,11 +145,16 @@ def extract_features(packet):
             with open(aggressive_log, 'a') as f:
                 f.write(alert_msg + "\n")
         
-        if connection_tracker[src_ip]['count'] >= THRESHOLD_CONNECTIONS:
-            alert_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ALERT] Port Scan Detected from {src_ip}"
-            print(alert_msg)
-            with open(aggressive_log, 'a') as f:
-                f.write(alert_msg + "\n")
+        if dst_port in MONITORED_PORTS:
+            port_tracker[dst_port] += 1
+            print(f"[DEBUG] Port {dst_port} ({MONITORED_PORTS[dst_port]}) scanned by {src_ip}")
+            
+            if port_tracker[dst_port] >= THRESHOLD_PORT_SCAN:
+                alert_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ALERT] Port Scan Detected: {MONITORED_PORTS[dst_port]} from {src_ip} 🚨"
+                print(alert_msg)
+                with open(port_scan_log, 'a') as f:
+                    f.write(alert_msg + "\n")
+                port_tracker[dst_port] = 0  # Reset after trigger
 
         if connection_tracker[src_ip]['srv_count'] >= THRESHOLD_UDP and packet.haslayer(UDP):
             alert_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ALERT] UDP Flood Detected from {src_ip}"
