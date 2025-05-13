@@ -1,10 +1,11 @@
-from scapy.all import sniff, IP, TCP, UDP, ICMP
+from scapy.all import sniff, IP, TCP, UDP, ICMP, Raw
 import pandas as pd
 import joblib
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import time
 import os
+import re
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -22,6 +23,7 @@ log_file = f'logs/intrusion_log_{int(time.time())}.txt'
 port_scan_log = f'logs/port_scan_log_{int(time.time())}.txt'
 packet_log_file = f'logs/packet_log_{int(time.time())}.csv'
 aggressive_log = f'logs/aggressive_log_{int(time.time())}.txt'
+flagged_ip_log = f'logs/flagged_ips_{int(time.time())}.txt'
 
 # Mapping protocol types
 PROTOCOLS = {
@@ -73,6 +75,8 @@ THRESHOLD_CONNECTIONS = 25 # 25 connections in 5 seconds
 THRESHOLD_PORT_SCAN = 3    # 3 hits on critical ports
 THRESHOLD_UDP = 15         # 15 UDP packets in 5 seconds
 RESET_INTERVAL = 5         # Reset counters every 5 seconds
+MAX_FAILED_ATTEMPTS = 5    # Number of failed attempts before flagging
+FLAG_WINDOW = 60           # Time window in seconds to count attempts
 
 # Complete List of Features with Aggressive Defaults
 TRAIN_FEATURES = [
@@ -89,6 +93,13 @@ TRAIN_FEATURES = [
     'dst_host_serror_rate', 'dst_host_srv_serror_rate',
     'dst_host_rerror_rate', 'dst_host_srv_rerror_rate'
 ]
+CREDENTIAL_PORTS = {
+    22: 'SSH',
+    23: 'Telnet',
+    80: 'HTTP',
+    443: 'HTTPS'
+}
+credential_tracker = {}
 # Default Values
 DEFAULT_VALUES = {feature: 0 for feature in TRAIN_FEATURES}
 DEFAULT_VALUES.update({
@@ -99,6 +110,15 @@ DEFAULT_VALUES.update({
     'same_srv_rate': 0.05,
 })
 connection_tracker = {}
+flagged_ips = set()
+USERNAME_PATTERN = re.compile(r"(USER|LOGIN|USERNAME):\s*(\w+)", re.IGNORECASE)
+PASSWORD_PATTERN = re.compile(r"(PASS|PASSWORD):\s*(\w+)", re.IGNORECASE)
+LOGIN_FAILED_PATTERNS = [
+    re.compile(r"Permission Denied", re.IGNORECASE),
+    re.compile(r"Authentication failed", re.IGNORECASE),
+    re.compile(r"Invalid password", re.IGNORECASE),
+    re.compile(r"401 Unauthorized", re.IGNORECASE)
+]
 port_tracker = {port: 0 for port in MONITORED_PORTS}
 
 def get_tcp_flag(packet):
@@ -107,6 +127,35 @@ def get_tcp_flag(packet):
         flag_str = str(flags)
         return TCP_FLAG_MAP.get(flag_str, 'OTH')
     return 'OTH'
+
+def log_failed_attempt(src_ip, dst_port, username, password):
+    """Logs failed credential attempts to a file for further analysis."""
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+    service = CREDENTIAL_PORTS.get(dst_port, 'Unknown')
+    log_entry = f"[{timestamp}] {service} FAILED login from {src_ip} → Username: {username}, Password: {password}\n"
+    print(log_entry)
+    
+    with open(credential_log, 'a') as f:
+        f.write(log_entry)
+
+    # 🚩 **Track the number of failed attempts**
+    if src_ip not in credential_tracker:
+        credential_tracker[src_ip] = {'count': 0, 'start_time': time.time()}
+    
+    credential_tracker[src_ip]['count'] += 1
+
+    # Time-based reset
+    if time.time() - credential_tracker[src_ip]['start_time'] > FLAG_WINDOW:
+        credential_tracker[src_ip] = {'count': 0, 'start_time': time.time()}
+
+    # 🚩 **Flag IP if it exceeds the max threshold**
+    if credential_tracker[src_ip]['count'] >= MAX_FAILED_ATTEMPTS:
+        if src_ip not in flagged_ips:
+            flagged_ips.add(src_ip)
+            print(f"[ALERT] 🚨 IP {src_ip} flagged for excessive failed attempts on {service}")
+            with open(flagged_ip_log, 'a') as f:
+                f.write(f"[{timestamp}] 🚨 IP {src_ip} flagged for brute-force attempts on {service}\n")
+        credential_tracker[src_ip] = {'count': 0, 'start_time': time.time()}
 
 def extract_features(packet):
     try:
@@ -155,6 +204,17 @@ def extract_features(packet):
                 with open(port_scan_log, 'a') as f:
                     f.write(alert_msg + "\n")
                 port_tracker[dst_port] = 0  # Reset after trigger
+
+        if dst_port in CREDENTIAL_PORTS and packet.haslayer(Raw):
+            payload = packet[Raw].load.decode(errors='ignore')
+            # Extract username and password
+            username_match = USERNAME_PATTERN.search(payload)
+            password_match = PASSWORD_PATTERN.search(payload)
+            if any(pattern.search(payload) for pattern in LOGIN_FAILED_PATTERNS):
+                if username_match and password_match:
+                    username = username_match.group(2)
+                    password = password_match.group(2)
+                    log_failed_attempt(src_ip, dst_port, username, password)
 
         if connection_tracker[src_ip]['srv_count'] >= THRESHOLD_UDP and packet.haslayer(UDP):
             alert_msg = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ALERT] UDP Flood Detected from {src_ip}"
@@ -217,4 +277,4 @@ def detect_intrusion(packet):
 
 # Start sniffing (promiscuous mode to capture all packets)
 print("Starting live traffic detection...")
-sniff(filter="ip", prn=detect_intrusion, store=0)
+sniff(iface="lo", prn=detect_intrusion, store=0)
