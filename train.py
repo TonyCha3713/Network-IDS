@@ -1,41 +1,97 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, accuracy_score
+import numpy as np
 import joblib
-import os
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+from xgboost import XGBClassifier
+import xgboost as xgb
+import matplotlib.pyplot as plt
+# --------------------------
+# Load Data
+# --------------------------
 
-# Create directory for models if it doesn't exist
-os.makedirs('model_dir', exist_ok=True)
+df = pd.read_csv('ml_dataset.csv')
+# --------------------------
+# Duplicate Rare Classes
+# --------------------------
 
-# Load preprocessed data
-print("Loading preprocessed data...")
-X = pd.read_csv('data_dir/X_train.csv')
-y = pd.read_csv('data_dir/y_train.csv')
+# Define which classes are rare
+RARE_CLASSES = ["Exfil","DDoS", "BruteForce", "Misc"]
 
-# Display the shape of the data
-print(f"Feature set shape: {X.shape}")
-print(f"Labels shape: {y.shape}")
+# How many times to duplicate rare rows
+DUPLICATION_FACTOR = 10
 
-# Split the data
-print("Splitting data into training and testing sets...")
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Duplicate rare rows
+df_augmented = df.copy()
+for rare_class in RARE_CLASSES:
+    rare_rows = df[df["Label"] == rare_class]
+    if len(rare_rows) > 0:
+        duplicated = pd.concat([rare_rows]*DUPLICATION_FACTOR, ignore_index=True)
+        df_augmented = pd.concat([df_augmented, duplicated], ignore_index=True)
 
-# Initialize and train the model
-print("Training the RandomForest model with all 41 features...")
-model = RandomForestClassifier(n_estimators=300, random_state=42, max_depth=25, n_jobs=-1)
-model.fit(X_train, y_train.values.ravel())
+print(df_augmented["Label"].value_counts())
 
-# Evaluate the model
-print("Evaluating the model...")
-y_pred = model.predict(X_test)
-print("\nAccuracy Score:", accuracy_score(y_test, y_pred))
-print("\nClassification Report:\n", classification_report(y_test, y_pred))
+# --------------------------
+# Preprocessing
+# --------------------------
 
-# Save the model
-model_path = 'model_dir/ids_model.pkl'
-print(f"Saving the model to {model_path}...")
-joblib.dump(model, model_path)
+# Fill any missing values
+df_augmented = df_augmented.fillna(0)
 
-print("Training complete. Model saved successfully.")
+# Encode categorical columns
+df_augmented['Label'] = df_augmented['Label'].astype('category')
+
+# Save mapping for future decoding
+label_mapping = dict(enumerate(df_augmented['Label'].cat.categories))
+print("Label mapping:", label_mapping)
+
+# Get X and y
+X = df_augmented.drop('Label', axis=1)
+y = df_augmented['Label'].cat.codes
+
+# --------------------------
+# Train/Test Split
+# --------------------------
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# --------------------------
+# Train XGBoost
+# --------------------------
+
+clf = XGBClassifier(
+    n_estimators=400,
+    max_depth=8,
+    learning_rate=0.1,
+    eval_metric='mlogloss',
+    random_state=42
+)
+
+clf.fit(X_train, y_train)
+
+# --------------------------
+# Predict & Report
+# --------------------------
+
+y_pred = clf.predict(X_test)
+
+# Convert numeric predictions back to readable labels
+y_pred_labels = [label_mapping[x] for x in y_pred]
+y_test_labels = [label_mapping[x] for x in y_test]
+
+print("\nClassification Report:\n")
+print(classification_report(
+    y_test_labels,
+    y_pred_labels,
+))
+
+# --------------------------
+# Save Model
+# --------------------------
+xgb.plot_importance(clf, max_num_features=20)
+plt.show()
+joblib.dump(clf, "ids_model.joblib")
+print("\nModel saved as ids_model.joblib")
 
