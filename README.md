@@ -2,6 +2,9 @@
 Network Intrusion Detection System with ML models for accurate classification
 Built a real-time IDS that captures live network traffic using PyShark and analyzes network flows to detect attacks like port scans, brute force attempts, DDoS floods, and data exfiltration. The system extracts features including packet rates, inter-arrival times, byte volumes, and connection rates, and uses an XGBoost model trained on labeled flow data for accurate classification. Achieved an accuracy of 98.2% during performance across multiple attack types, with the ability to trigger real-time alerts and generate visualizations for monitoring threats. Implemented configurable behavioral thresholds and logging to create an ML-ready dataset, demonstrating how machine learning and traditional network analytics can work together for adaptive threat detection.
 
+<img width="1778" height="1011" alt="Screenshot 2025-07-14 at 11 36 01 PM" src="https://github.com/user-attachments/assets/73cb4569-c98f-421d-9aa6-60655b6d6f2f" />
+<img width="573" height="321" alt="Screenshot 2025-07-14 at 11 37 29 PM" src="https://github.com/user-attachments/assets/c1b3f916-fd51-40d7-8761-d6ca366741e4" />
+
 
 ## Key Features
 + Real-time Prediction: Captures real-time network traffic using PyShark for continuous monitoring.
