@@ -62,14 +62,6 @@ https://github.com/user-attachments/assets/abe912da-43c5-4c52-8c78-4a297434b78b
 + **Brute Force** `hydra -l user -P <wordlist.txt> ssh://<target_ip>`
 + **DDoS** `ping -c 5000 -i 0.01 <target_ip>`
 + **Exfil** `scp file.zip user@<target_ip>:/`
-<<<<<<< HEAD
-
-## Security Recommendations for IDS
-+ Adjust thresholds to match normal network behavior and reduce false positives, especially in environments with varying traffic volumes.
-+ Run the IDS with the minimum permissions necessary and avoid executing it as root unless absolutely required for packet capture.
-+ Regularly rotate and securely store logs, as IDS alerts can contain sensitive data such as IP addresses and potential attack indicators.
-+ Continuously monitor new attack techniques and update detection rules and machine learning models to keep pace with evolving threats.
-=======
 
 ## Security Recommendations for IDS
 + Adjust thresholds to match normal network behavior and reduce false positives, especially in environments with varying traffic volumes.
@@ -77,5 +69,9 @@ https://github.com/user-attachments/assets/abe912da-43c5-4c52-8c78-4a297434b78b
 + Regularly rotate and securely store logs, as IDS alerts can contain sensitive data such as IP addresses and potential attack indicators.
 + Continuously monitor new attack techniques and update detection rules and machine learning models to keep pace with evolving threats.
 
+## Security Recommendations for IDS
++ Adjust thresholds to match normal network behavior and reduce false positives, especially in environments with varying traffic volumes.
++ Run the IDS with the minimum permissions necessary and avoid executing it as root unless absolutely required for packet capture.
++ Regularly rotate and securely store logs, as IDS alerts can contain sensitive data such as IP addresses and potential attack indicators.
++ Continuously monitor new attack techniques and update detection rules and machine learning models to keep pace with evolving threats.
 
->>>>>>> 1ee0e5e26263f7fd9df532fbf9818ec5f67b5234
