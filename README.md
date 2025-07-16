@@ -6,7 +6,7 @@ https://github.com/user-attachments/assets/abe912da-43c5-4c52-8c78-4a297434b78b
 
 <img width="1778" height="1011" alt="Screenshot 2025-07-14 at 11 36 01 PM" src="https://github.com/user-attachments/assets/73cb4569-c98f-421d-9aa6-60655b6d6f2f" />
 
-<img width="573" height="321" alt="Screenshot 2025-07-14 at 11 37 29 PM" src="https://github.com/user-attachments/assets/c1b3f916-fd51-40d7-8761-d6ca366741e4" />
+<img width="624" height="468" alt="Screenshot 2025-07-16 at 10 13 14 AM" src="https://github.com/user-attachments/assets/597f325a-50f7-45da-a613-1d8e3588b086" />
 
 
 ## Key Features
