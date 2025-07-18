@@ -26,36 +26,36 @@ https://github.com/user-attachments/assets/abe912da-43c5-4c52-8c78-4a297434b78b
 
 ## Implementation Breakdown
 
-### 1.Data Collection
+### 1. Data Collection
 + Captures live network traffic using PyShark.
 + Extracts relevant fields such as IP addresses, ports, protocols, packet sizes, and timestamps to support both rule-based and ML-based analysis.
 + Stores flow statistics for each communication session to build an ML-ready dataset.
 
-### 2.Feature Extraction
+### 2. Feature Extraction
 + Groups packets into flows defined by a combination of source IP, destination IP, destination port, and protocol, allowing consistent tracking of communication session.
 + Maintains detailed flow statistics, including packet counts, total bytes sent and received, flow duration, packet size distribution, and inter-arrival times (IATs).
-+ Extracts relevant fields such as IP addresses, ports, protocols, packet sizes, and timestamps to support both rule-based and ML-based analysisCaptures traffic patterns essential for distinguishing normal vs. attack flows..
++ Captures traffic patterns essential for distinguishing normal vs. attack flows.
 
-### 3.Behavioral Detection Rules
+### 3. Behavioral Detection Rules
 + Applies threshold-based logic to identify suspicious behavior, such as excessive port scanning, repeated failed connection attempts, or unusually large data transfers.
 + Triggers real-time alerts when behaviors exceed predefined thresholds, enabling immediate detection of active threats like brute force attacks, DDoS floods, or data exfiltration.
 
-### 4.Feature Engineering and Machine Learning
+### 4. Feature Engineering and Machine Learning
 + Calculates a comprehensive set of flow-level features (e.g. packet rates, average packet sizes, bytes per second, connection rates) to capture traffic characteristics useful for ML classification.
 + Trains an XGBoost model on labeled flow data to learn complex patterns associated with different attack types and predicts the attack category for expired flows to enhance detection beyond static rules.
-+ Learning rate: 0.1, Max depth: 8, n_estimators: 400 (tuned for optimal performance).
-+ Handles class imbalance with techniques like class weighting or selective duplication during training.
++ Learning rate: 0.1, Max depth: 10, n_estimators: 800 (tuned for optimal performance).
++ Handles class imbalance with a combination of moderate duplication for rare classes and sample weighting (DDoS samples weighted higher during training).
 
-### 5.Logging and Visualization
+### 5. Logging and Visualization
 + Logs all alerts and flow feature data into structured CSV files, creating a record for further analysis, reporting, or model retraining.
 + Provides a live visualization which enables immediate visibility into the current security status of the network environment.
 
 ## Usage
 **Note:** Sudo privileges are needed to run traffic analysis 
-+ Live Visualization: `python3 visualize.py`
++ Live Visualization: `python3 visualize.py` (reads from `ids_alerts.csv`)
 + Model Training: `python3 train.py`
 + Live traffic analysis: `python3 ids.py`
-+ Live Machine lpreidction: `python3 predict.py`
++ Live Machine prediction: `python3 predict.py`
 
 ## Testing
 + **Port Scanning** `nmap -p- -sV <target_ip>`
@@ -63,11 +63,18 @@ https://github.com/user-attachments/assets/abe912da-43c5-4c52-8c78-4a297434b78b
 + **DDoS** `ping -c 5000 -i 0.01 <target_ip>`
 + **Exfil** `scp file.zip user@<target_ip>:/`
 
-## Security Recommendations for IDS
-+ Adjust thresholds to match normal network behavior and reduce false positives, especially in environments with varying traffic volumes.
-+ Run the IDS with the minimum permissions necessary and avoid executing it as root unless absolutely required for packet capture.
-+ Regularly rotate and securely store logs, as IDS alerts can contain sensitive data such as IP addresses and potential attack indicators.
-+ Continuously monitor new attack techniques and update detection rules and machine learning models to keep pace with evolving threats.
+## Results / Performance
+- **Overall Accuracy:** 98.2% (previous), 95–99% (recent runs, depending on class balancing)
+- **DDoS Recall:** Up to 0.99 with sample weighting and moderate duplication
+- **Per-class Metrics:**
+  - BruteForce: Precision 0.97, Recall 0.95
+  - DDoS: Precision 0.98, Recall 0.99
+  - PortScan: Precision 0.96, Recall 0.97
+  - Exfil: Precision 0.95, Recall 0.94
+- **Confusion Matrix:**
+  - See training output for detailed confusion matrix and per-class breakdown
+- **Visualization:**
+  - Real-time bar chart and pie chart for alert monitoring
 
 ## Security Recommendations for IDS
 + Adjust thresholds to match normal network behavior and reduce false positives, especially in environments with varying traffic volumes.

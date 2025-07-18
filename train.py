@@ -7,11 +7,16 @@ from sklearn.metrics import classification_report
 from xgboost import XGBClassifier
 import xgboost as xgb
 import matplotlib.pyplot as plt
+
 # --------------------------
 # Load Data
 # --------------------------
+try:
+    df = pd.read_csv('ml_dataset.csv')
+except FileNotFoundError:
+    print("ml_dataset.csv not found. Please generate the dataset first.")
+    exit(1)
 
-df = pd.read_csv('ml_dataset.csv')
 # --------------------------
 # Duplicate Rare Classes
 # --------------------------
@@ -22,7 +27,6 @@ RARE_CLASSES = ["Exfil","DDoS", "BruteForce", "Misc", "PortScan"]
 # How many times to duplicate rare rows
 DUPLICATION_FACTOR = 3
 
-# Duplicate rare rows
 df_augmented = df.copy()
 for rare_class in RARE_CLASSES:
     rare_rows = df[df["Label"] == rare_class]
@@ -35,25 +39,17 @@ print(df_augmented["Label"].value_counts())
 # --------------------------
 # Preprocessing
 # --------------------------
-
-# Fill any missing values
 df_augmented = df_augmented.fillna(0)
-
-# Encode categorical columns
 df_augmented['Label'] = df_augmented['Label'].astype('category')
-
-# Save mapping for future decoding
 label_mapping = dict(enumerate(df_augmented['Label'].cat.categories))
 print("Label mapping:", label_mapping)
 
-# Get X and y
 X = df_augmented.drop('Label', axis=1)
 y = df_augmented['Label'].cat.codes
 
 # --------------------------
 # Train/Test Split
 # --------------------------
-
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
@@ -61,7 +57,6 @@ X_train, X_test, y_train, y_test = train_test_split(
 # --------------------------
 # Train XGBoost
 # --------------------------
-
 clf = XGBClassifier(
     n_estimators=800,
     max_depth=10,
@@ -70,33 +65,16 @@ clf = XGBClassifier(
     random_state=42
 )
 
-# Suppose y_train is your label array (numeric codes)
-# and df_augmented is your training DataFrame with a 'Label' column
-
 # Create a weight array: higher for DDoS, 1 for others
-weights = df_augmented['Label'].apply(lambda x: 3 if x == 'DDoS' else 1)  # 5x weight for DDoS
+weights = df_augmented['Label'].apply(lambda x: 3 if x == 'DDoS' else 1)
 
-# When fitting the model:
+# Fit the model
 clf.fit(X_train, y_train, sample_weight=weights.loc[X_train.index])
-#results = clf.evals_result()
-#
-#train_error = results['validation_0']['mlogloss']
-#test_error = results['validation_1']['mlogloss']
-#
-#plt.plot(train_error, label='Training')
-#plt.plot(test_error, label='Test')
-#plt.xlabel('Boosting Round')
-#plt.ylabel('Log Loss')
-#plt.legend()
-#plt.title('Training vs Test Error (Log Loss)')
-#plt.show()
+
 # --------------------------
 # Predict & Report
 # --------------------------
-
 y_pred = clf.predict(X_test)
-
-# Convert numeric predictions back to readable labels
 y_pred_labels = [label_mapping[x] for x in y_pred]
 y_test_labels = [label_mapping[x] for x in y_test]
 
@@ -109,7 +87,8 @@ print(classification_report(
 # --------------------------
 # Save Model
 # --------------------------
-#xgb.plot_importance(clf, max_num_features=20)
-#plt.show()
-joblib.dump(clf, "ids_model.joblib")
-print("\nModel saved as ids_model.joblib")
+try:
+    joblib.dump(clf, "ids_model.joblib")
+    print("\nModel saved as ids_model.joblib")
+except Exception as e:
+    print(f"Error saving model: {e}")

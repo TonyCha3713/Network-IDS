@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import time
-from collections import defaultdict
 import numpy as np
 
 plt.style.use('seaborn-v0_8-darkgrid')  # modern, clean style
@@ -12,8 +11,10 @@ plt.tight_layout(pad=4.0)
 
 while True:
     try:
-        # Read the alerts CSV
-        df = pd.read_csv("ml_dataset.csv")
+        # Read the alerts CSV (real-time alerts)
+        df = pd.read_csv("ids_alerts.csv")
+        if df.empty or 'Label' not in df.columns:
+            raise ValueError("No alert data or missing 'Label' column in ids_alerts.csv")
         now = pd.Timestamp.now()
 
         # Count each attack type
@@ -47,6 +48,12 @@ while True:
         plt.draw()
         plt.pause(5)   # refresh every 5 seconds
 
+    except FileNotFoundError:
+        print("ids_alerts.csv not found. Waiting for alerts...")
+        time.sleep(5)
+    except ValueError as ve:
+        print(f"Data error: {ve}")
+        time.sleep(5)
     except Exception as e:
         print(f"Error reading alerts: {e}")
         time.sleep(5)
