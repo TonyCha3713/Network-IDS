@@ -6,6 +6,7 @@ import json
 import numpy as np
 from collections import defaultdict
 import joblib
+import pandas as pd
 
 clf = joblib.load("ids_model.joblib")
 with open("label_mapping.json") as f:

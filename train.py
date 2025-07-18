@@ -17,7 +17,7 @@ df = pd.read_csv('ml_dataset.csv')
 # --------------------------
 
 # Define which classes are rare
-RARE_CLASSES = ["Exfil","DDoS", "BruteForce"]
+RARE_CLASSES = ["Exfil","DDoS", "BruteForce", "Misc", "PortScan"]
 
 # How many times to duplicate rare rows
 DUPLICATION_FACTOR = 3
@@ -57,24 +57,27 @@ y = df_augmented['Label'].cat.codes
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
-weights = compute_sample_weight(
-    class_weight='balanced',
-    y=y_train
-)
 
 # --------------------------
 # Train XGBoost
 # --------------------------
 
 clf = XGBClassifier(
-    n_estimators=400,
-    max_depth=13,
+    n_estimators=800,
+    max_depth=10,
     learning_rate=0.1,
     eval_metric='mlogloss',
     random_state=42
 )
 
-clf.fit(X_train, y_train,eval_set = [(X_train, y_train), (X_test, y_test)])
+# Suppose y_train is your label array (numeric codes)
+# and df_augmented is your training DataFrame with a 'Label' column
+
+# Create a weight array: higher for DDoS, 1 for others
+weights = df_augmented['Label'].apply(lambda x: 3 if x == 'DDoS' else 1)  # 5x weight for DDoS
+
+# When fitting the model:
+clf.fit(X_train, y_train, sample_weight=weights.loc[X_train.index])
 #results = clf.evals_result()
 #
 #train_error = results['validation_0']['mlogloss']
