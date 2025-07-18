@@ -15,18 +15,16 @@ label_mapping = {int(k): v for k, v in label_mapping.items()}
 # IDS thresholds
 # -----------------------------
 
-PORT_SCAN_PORT_THRESHOLD = 300
-PORT_SCAN_TIME_WINDOW = 30
+PORT_SCAN_PORT_THRESHOLD = 200
+PORT_SCAN_TIME_WINDOW = 20
 
 BRUTE_FORCE_ATTEMPTS_THRESHOLD = 300
-BRUTE_FORCE_TIME_WINDOW = 30
-RST_THRESHOLD = 50
+BRUTE_FORCE_TIME_WINDOW = 15
 AVG_PKT_SIZE_THRESHOLD = 60
-MIN_FWD_PKTS = 150
 
-DDOS_PACKETS_PER_SEC_THRESHOLD = 20000
+DDOS_PACKETS_PER_SEC_THRESHOLD = 5000
 
-EXFIL_BYTES_THRESHOLD = 10_000_000
+EXFIL_BYTES_THRESHOLD = 50_000_000
 
 RATE_THRESHOLD = 5000
 FLOW_TIMEOUT = 150
@@ -210,15 +208,15 @@ def label_expired_flow(flow_key, flow):
                 alert["src_ip"] == flow_key[0] and
                 flow["last_seen"] >= alert["timestamp"] - 60 and
                 flow["first_seen"] <= alert["timestamp"] + 60 and
-                (flow["total_bytes_fwd"] + flow["total_bytes_bwd"]) > 10_000_000
+                (flow["total_bytes_fwd"] + flow["total_bytes_bwd"]) > 50_000_000
             ):
                 return "Exfil"
 
         if alert["attack_type"] == "DDoS":
             if (
                 alert["dst_ip"] == flow_key[1] and
-                flow["last_seen"] >= alert["timestamp"] - 60 and
-                flow["first_seen"] <= alert["timestamp"] + 60
+                flow["last_seen"] >= alert["timestamp"] - 30 and
+                flow["first_seen"] <= alert["timestamp"] + 30
             ):
                 return "DDoS"
 
@@ -234,8 +232,8 @@ def label_expired_flow(flow_key, flow):
             if (
                 alert["src_ip"] == flow_key[0] and
                 alert["dst_ip"] == flow_key[1] and
-                flow["last_seen"] >= alert["timestamp"] - 60 and
-                flow["first_seen"] <= alert["timestamp"] + 60
+                flow["last_seen"] >= alert["timestamp"] - 30 and
+                flow["first_seen"] <= alert["timestamp"] + 30
             ):
                 return "BruteForce"
 
@@ -294,30 +292,22 @@ def expire_flows(current_time):
             flow_iat_max = 0
             flow_iat_min = 0
 
-        if flow.get("rst_flag_count", 0) > RST_THRESHOLD:
-            log_alert(
-                flow["last_seen"],
-                "BruteForce",
-                fk[0],
-                fk[1],
-                fk[2],
-                flow["protocol"],
-                f"RSTs: {flow['rst_flag_count']}"
-            )
-            flow_labels[fk] = "BruteForce"
-
-        # Check low average packet size
-        if avg_pkt_size < AVG_PKT_SIZE_THRESHOLD and total_fwd_pkts > MIN_FWD_PKTS:
-            log_alert(
-                flow["last_seen"],
-                "BruteForce",
-                fk[0],
-                fk[1],
-                fk[2],
-                flow["protocol"],
-                f"Avg size={avg_pkt_size:.2f}, pkts={total_fwd_pkts}"
-            )
-            flow_labels[fk] = "BruteForce"
+        label = flow_labels.get(fk, "Misc")
+        if label == "BruteForce":
+            if avg_pkt_size < AVG_PKT_SIZE_THRESHOLD: 
+                log_alert(
+                    flow["last_seen"],
+                    "BruteForce",
+                    fk[0],
+                    fk[1],
+                    fk[2],
+                    flow["protocol"],
+                    f"Avg size={avg_pkt_size:.2f}, pkts={total_fwd_pkts}"
+                )
+                flow_labels[fk] = "BruteForce"
+            else:
+                flow_labels[fk] = "Misc"
+                print("ML Prediction: Not enough Force")
 
         # -------------------------
         # Label Expired Flow

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import joblib
 from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.metrics import classification_report
 from xgboost import XGBClassifier
 import xgboost as xgb
@@ -16,10 +17,10 @@ df = pd.read_csv('ml_dataset.csv')
 # --------------------------
 
 # Define which classes are rare
-RARE_CLASSES = ["Exfil","DDoS", "BruteForce", "Misc"]
+RARE_CLASSES = ["Exfil","DDoS", "BruteForce"]
 
 # How many times to duplicate rare rows
-DUPLICATION_FACTOR = 10
+DUPLICATION_FACTOR = 3
 
 # Duplicate rare rows
 df_augmented = df.copy()
@@ -56,6 +57,10 @@ y = df_augmented['Label'].cat.codes
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
+weights = compute_sample_weight(
+    class_weight='balanced',
+    y=y_train
+)
 
 # --------------------------
 # Train XGBoost
@@ -63,14 +68,25 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 clf = XGBClassifier(
     n_estimators=400,
-    max_depth=8,
+    max_depth=13,
     learning_rate=0.1,
     eval_metric='mlogloss',
     random_state=42
 )
 
-clf.fit(X_train, y_train)
-
+clf.fit(X_train, y_train,eval_set = [(X_train, y_train), (X_test, y_test)])
+#results = clf.evals_result()
+#
+#train_error = results['validation_0']['mlogloss']
+#test_error = results['validation_1']['mlogloss']
+#
+#plt.plot(train_error, label='Training')
+#plt.plot(test_error, label='Test')
+#plt.xlabel('Boosting Round')
+#plt.ylabel('Log Loss')
+#plt.legend()
+#plt.title('Training vs Test Error (Log Loss)')
+#plt.show()
 # --------------------------
 # Predict & Report
 # --------------------------
@@ -90,8 +106,7 @@ print(classification_report(
 # --------------------------
 # Save Model
 # --------------------------
-xgb.plot_importance(clf, max_num_features=20)
-plt.show()
+#xgb.plot_importance(clf, max_num_features=20)
+#plt.show()
 joblib.dump(clf, "ids_model.joblib")
 print("\nModel saved as ids_model.joblib")
-
